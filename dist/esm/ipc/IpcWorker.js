@@ -5,10 +5,15 @@ export class IpcWorker {
     }
     /**
      * Start listening to IPC messages from the IpcRouter (main process).
+     * Only processes messages that carry a `reqId` (i.e. router-originated).
+     * Other messages (e.g. heartbeats, custom signals) are ignored.
      */
     start() {
         process.on('message', (msg) => {
-            this.handleMessage(msg).catch(err => {
+            // Ignore messages that are not IPC router commands
+            if (!msg.reqId)
+                return;
+            this.handleMessage(msg).catch((err) => {
                 if (msg.reqId && process.send) {
                     process.send({ reqId: msg.reqId, error: err.message });
                 }
