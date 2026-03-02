@@ -63,7 +63,6 @@ describe('JobQueue', () => {
         queue.on('failed', failedMock);
         await queue.initialize();
         await queue.enqueue({ type: 'slow', payload: {}, maxDuration: 100, maxAttempts: 1 });
-        queue.on('active', () => console.log('ACTIVE LOG EVENT'));
         // Tick: 0ms — picks up job and starts executing handler
         await vi.advanceTimersByTimeAsync(1);
         // Tick: 200ms — fires timeout (maxDuration=100ms) and aborts

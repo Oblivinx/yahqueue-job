@@ -15,6 +15,7 @@ import { resolveConfig } from '../config/QueueConfig.js';
 import { AdapterError } from '../errors/AdapterError.js';
 import { QueueError } from '../errors/QueueError.js';
 import { JobTimeoutError } from '../errors/JobTimeoutError.js';
+import { DiscardJobError } from '../errors/DiscardJobError.js';
 import { Metrics } from '../plugins/Metrics.js';
 import { DeadLetterQueue } from '../plugins/DeadLetterQueue.js';
 import { JobTTL } from '../plugins/JobTTL.js';
@@ -193,6 +194,83 @@ export class JobQueue {
     async clear() {
         await this.cfg.adapter.clear();
     }
+    /**
+     * Run a job handler directly in-process, bypassing the queue entirely.
+     *
+     * Useful for:
+     *  - Testing handlers without queue overhead
+     *  - Urgent/synchronous one-off executions
+     *  - Running jobs in contexts where queue workers are not started
+     *
+     * Plugin hooks (`onEnqueue`, `onProcess`, `onComplete`, `onFail`) are still
+     * invoked so metrics, rate-limiters, and other plugins remain accurate.
+     *
+     * @returns The handler's return value on success
+     * @throws The original handler error on failure (no retries)
+     *
+     * @example
+     * const result = await queue.runInProcess('sendEmail', { to: 'a@b.com' });
+     */
+    async runInProcess(type, payload, options) {
+        this.checkOpen();
+        const job = createJob({ type, payload, ...options }, {
+            defaultPriority: this.cfg.defaultPriority,
+            defaultMaxAttempts: this.cfg.defaultMaxAttempts,
+            defaultMaxDuration: this.cfg.defaultMaxDuration,
+        });
+        // onEnqueue hooks (rate-limiter, deduplicator, etc.)
+        for (const plugin of this.cfg.plugins) {
+            if (plugin.onEnqueue)
+                await plugin.onEnqueue(job);
+        }
+        // onProcess hooks
+        for (const plugin of this.cfg.plugins) {
+            if (plugin.onProcess)
+                await plugin.onProcess(job);
+        }
+        const handler = this.registry.lookup(type);
+        const ctx = { jobId: job.id, attempt: 1 };
+        let handlerResult;
+        try {
+            let timeoutId;
+            const maxDuration = options?.maxDuration ?? this.cfg.defaultMaxDuration;
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => reject(new JobTimeoutError(job.id, maxDuration)), maxDuration);
+            });
+            handlerResult = await Promise.race([
+                handler(job.payload, ctx),
+                timeoutPromise,
+            ]).finally(() => clearTimeout(timeoutId));
+        }
+        catch (err) {
+            const error = err instanceof Error ? err : new QueueError(String(err));
+            const result = JobResultFactory.failure(error);
+            const failedJob = updateJob(job, {
+                state: JobState.FAILED,
+                attempts: 1,
+                lastError: error.message,
+                finishedAt: systemClock.now(),
+            });
+            for (const plugin of this.cfg.plugins) {
+                if (plugin.onFail)
+                    await plugin.onFail(failedJob, error);
+            }
+            this.emitter.emit(QueueEvent.FAILED, failedJob, error);
+            throw err;
+        }
+        const result = JobResultFactory.success(handlerResult);
+        const doneJob = updateJob(job, {
+            state: JobState.DONE,
+            attempts: 1,
+            finishedAt: systemClock.now(),
+        });
+        for (const plugin of this.cfg.plugins) {
+            if (plugin.onComplete)
+                await plugin.onComplete(doneJob, result);
+        }
+        this.emitter.emit(QueueEvent.COMPLETED, doneJob, result);
+        return handlerResult;
+    }
     /** Get metrics snapshot */
     get metrics() {
         const metricsPlugin = this.cfg.plugins.find((p) => p instanceof Metrics);
@@ -270,7 +348,11 @@ export class JobQueue {
             }
         }
         catch (err) {
-            // Plugin rejected (e.g. Throttle exceeded) — put back
+            if (DiscardJobError.is(err)) {
+                // Plugin requested silent discard — drop job, do NOT re-queue
+                return false;
+            }
+            // Any other error (e.g. Throttle exceeded) — put back and retry later
             await this.cfg.adapter.push(job).catch(() => { });
             return false;
         }
@@ -332,8 +414,9 @@ export class JobQueue {
     }
     async onFailure(job, error) {
         const attempts = job.attempts + 1;
-        const retryPolicy = this.defaultRetry;
-        if (retryPolicy.shouldRetry(attempts, error)) {
+        // Per-job retry policy takes precedence over the queue-level default
+        const retryPolicy = job.retryPolicy ?? this.defaultRetry;
+        if (attempts < job.maxAttempts && retryPolicy.shouldRetry(attempts, error)) {
             const delay = retryPolicy.nextDelay(attempts, error);
             const retryJob = updateJob(job, {
                 state: JobState.RETRYING,
@@ -404,5 +487,5 @@ export class JobQueue {
         }
     }
     // Keep imports alive
-    static _imports = { sleep, AdapterError, QueueError, JobTimeoutError };
+    static _imports = { sleep, AdapterError, QueueError, JobTimeoutError, DiscardJobError };
 }

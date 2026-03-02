@@ -26,6 +26,10 @@ export { Metrics } from './plugins/Metrics.js';
 export { DeadLetterQueue } from './plugins/DeadLetterQueue.js';
 export { Throttle } from './plugins/Throttle.js';
 export { JobTTL } from './plugins/JobTTL.js';
+export { Debounce } from './plugins/Debounce.js';
+export * from './ipc/IpcRouter.js';
+export * from './ipc/IpcWorker.js';
+export * from './ipc/types.js';
 // ─── Persistence ──────────────────────────────────────────────────────────────
 export { WALWriter } from './persistence/WALWriter.js';
 export { Snapshot } from './persistence/Snapshot.js';
@@ -38,6 +42,7 @@ export { QueueError } from './errors/QueueError.js';
 export { JobTimeoutError } from './errors/JobTimeoutError.js';
 export { AdapterError } from './errors/AdapterError.js';
 export { RateLimitError } from './errors/RateLimitError.js';
+export { DiscardJobError } from './errors/DiscardJobError.js';
 export { DependencyError, CyclicDependencyError, UnknownJobTypeError } from './errors/DependencyError.js';
 // ─── Utils ────────────────────────────────────────────────────────────────────
 export { generateId } from './utils/idGenerator.js';

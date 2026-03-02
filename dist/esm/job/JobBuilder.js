@@ -97,6 +97,7 @@ export class JobBuilder {
             ttl: this._ttl,
             flowId: this._flowId,
             dependsOn: this._dependsOn,
+            retryPolicy: this._retryPolicy,
         };
         return createJob(opts, BUILDER_DEFAULTS);
     }

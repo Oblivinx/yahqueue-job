@@ -23,6 +23,7 @@ export function createJob(options, defaults) {
         expiresAt: ttl !== undefined ? now + ttl : undefined,
         flowId: options.flowId,
         dependsOn: options.dependsOn,
+        retryPolicy: options.retryPolicy,
     });
     return job;
 }
