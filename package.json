@@ -1,0 +1,48 @@
+{
+    "name": "wa-job-queue",
+    "version": "1.0.0",
+    "description": "Lightweight, memory-first Job Queue for WhatsApp bots",
+    "main": "dist/cjs/index.cjs",
+    "module": "dist/esm/index.js",
+    "types": "dist/types/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/esm/index.js",
+            "require": "./dist/cjs/index.cjs",
+            "types": "./dist/types/index.d.ts"
+        }
+    },
+    "scripts": {
+        "build": "npm run clean && npm run build:esm && npm run build:cjs && npm run build:types && npm run build:rename-cjs",
+        "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist', {recursive:true, force:true})\"",
+        "build:esm": "tsc -p tsconfig.build.json --module ESNext --outDir dist/esm",
+        "build:cjs": "tsc -p tsconfig.build.json --module CommonJS --outDir dist/cjs",
+        "build:types": "tsc -p tsconfig.build.json --declaration --emitDeclarationOnly --outDir dist/types",
+        "build:rename-cjs": "node -e \"const fs=require('fs'); const path=require('path'); function renameCjs(dir) { const files = fs.readdirSync(dir); for(const file of files) { const fullPath = path.join(dir, file); if(fs.statSync(fullPath).isDirectory()) renameCjs(fullPath); else if(fullPath.endsWith('.js')) { fs.renameSync(fullPath, fullPath.replace('.js', '.cjs')); } } }; renameCjs('./dist/cjs');\"",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "lint": "eslint src/**/*.ts",
+        "prepare": "npm run build"
+    },
+    "peerDependencies": {
+        "better-sqlite3": "^11.0.0"
+    },
+    "peerDependenciesMeta": {
+        "better-sqlite3": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@types/better-sqlite3": "^7.6.10",
+        "@types/node": "^20.0.0",
+        "@vitest/coverage-v8": "^2.1.8",
+        "typescript": "^5.6.3",
+        "vitest": "^2.1.8"
+    },
+    "dependencies": {
+        "nanoid": "^5.0.9"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
