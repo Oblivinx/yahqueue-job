@@ -1,3 +1,7 @@
+<div align="center">
+  <img height="1000" src="https://i.pinimg.com/736x/0c/a5/38/0ca5385762a719d9b78df1cef92f6a5f.jpg"  />
+</div>
+
 # wa-job-queue
 
 > **Enterprise-grade, framework-agnostic Job Queue for Node.js — No Redis required.**
