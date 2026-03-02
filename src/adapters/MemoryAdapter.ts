@@ -1,74 +1,75 @@
-import { IStorageAdapter } from './IStorageAdapter.js';
-import { Job, JobStatus } from '../core/types.js';
+import type { IStorageAdapter } from '../types/adapter.types.js';
+import type { Job, JobPayload } from '../types/job.types.js';
+import { PriorityHeap } from '../core/PriorityHeap.js';
+import { AdapterError } from '../errors/AdapterError.js';
 
+/**
+ * MemoryAdapter — default in-process adapter, zero external dependencies.
+ * Uses PriorityHeap internally for O(log n) priority scheduling.
+ */
 export class MemoryAdapter implements IStorageAdapter {
-    private items: Job<any>[] = [];
+    private readonly heap = new PriorityHeap();
+    /** Holds jobs in non-pending states (active, done, failed, etc.) */
+    private readonly store = new Map<string, Job<JobPayload>>();
 
-    constructor() { }
-
-    async push<T>(job: Job<T>): Promise<void> {
-        this.items.push(job);
-        this.sort();
+    async push<T extends JobPayload>(job: Job<T>): Promise<void> {
+        this.heap.insert(job);
     }
 
-    async pop<T>(): Promise<Job<T> | null> {
+    async pop<T extends JobPayload>(): Promise<Job<T> | null> {
         const now = Date.now();
-        // Find the first job that is ready to run (not delayed, or delay passed)
-        const index = this.items.findIndex(j => (j.status === 'pending' || j.status === 'delayed') && j.runAt <= now);
-        if (index !== -1) {
-            const job = this.items.splice(index, 1)[0];
-            return job;
-        }
-        return null;
+        const job = this.heap.extractMin(now);
+        if (!job) return null;
+        return job as Job<T>;
     }
 
-    async get<T>(id: string): Promise<Job<T> | null> {
-        return this.items.find(j => j.id === id) || null;
+    async peek<T extends JobPayload>(): Promise<Job<T> | null> {
+        const now = Date.now();
+        const job = this.heap.peekMin(now);
+        if (!job) return null;
+        return job as Job<T>;
     }
 
-    async update<T>(job: Job<T>): Promise<void> {
-        const index = this.items.findIndex(j => j.id === job.id);
-        if (index !== -1) {
-            this.items[index] = job;
-            this.sort();
+    async get<T extends JobPayload>(id: string): Promise<Job<T> | null> {
+        // Check heap-still-pending jobs via toArray
+        const inHeap = this.heap.toArray().find((j) => j.id === id);
+        if (inHeap) return inHeap as Job<T>;
+        return (this.store.get(id) as Job<T>) ?? null;
+    }
+
+    async update<T extends JobPayload>(job: Job<T>): Promise<void> {
+        const inHeap = this.heap.toArray().find((j) => j.id === job.id);
+        if (inHeap) {
+            // Still in heap → update in place (e.g. state change while pending)
+            this.heap.update(job);
         } else {
-            // If updating an active job that is not in the array (popped earlier), we can add it back if needed, e.g., if it failed.
-            if (job.status !== 'active') {
-                this.items.push(job);
-                this.sort();
-            }
+            this.store.set(job.id, job as Job<JobPayload>);
         }
     }
 
     async remove(id: string): Promise<void> {
-        this.items = this.items.filter(j => j.id !== id);
+        this.heap.remove(id);
+        this.store.delete(id);
     }
 
     async size(): Promise<number> {
-        return this.items.filter(j => j.status === 'pending' || j.status === 'delayed').length;
+        return this.heap.size;
+    }
+
+    async getAll<T extends JobPayload>(): Promise<Job<T>[]> {
+        const fromHeap = this.heap.toArray() as Job<T>[];
+        const fromStore = Array.from(this.store.values()) as Job<T>[];
+        return [...fromHeap, ...fromStore];
     }
 
     async clear(): Promise<void> {
-        this.items = [];
+        this.heap.clear();
+        this.store.clear();
     }
 
     async close(): Promise<void> {
         await this.clear();
-    }
-
-    private sort() {
-        this.items.sort((a, b) => {
-            // Primary sort: runAt (delayed jobs go later)
-            // Only jobs with runAt <= now should be considered for immediate popping
-            if (a.runAt !== b.runAt) {
-                return a.runAt - b.runAt;
-            }
-            // Secondary sort: priority (lower number = higher priority)
-            if (a.priority !== b.priority) {
-                return a.priority - b.priority;
-            }
-            // Tertiary sort: chronological creation (FIFO for same priority)
-            return a.createdAt - b.createdAt;
-        });
+        // Suppress unused import
+        void AdapterError;
     }
 }

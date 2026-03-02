@@ -1,7 +1,7 @@
 {
     "name": "wa-job-queue",
-    "version": "1.0.0",
-    "description": "Lightweight, memory-first Job Queue for WhatsApp bots",
+    "version": "2.0.0",
+    "description": "Enterprise-grade, framework-agnostic Job Queue for Node.js — No Redis required",
     "main": "dist/cjs/index.cjs",
     "module": "dist/esm/index.js",
     "types": "dist/types/index.d.ts",
@@ -18,10 +18,16 @@
         "build:esm": "tsc -p tsconfig.build.json --module ESNext --outDir dist/esm",
         "build:cjs": "tsc -p tsconfig.build.json --module CommonJS --outDir dist/cjs",
         "build:types": "tsc -p tsconfig.build.json --declaration --emitDeclarationOnly --outDir dist/types",
-        "build:rename-cjs": "node -e \"const fs=require('fs'); const path=require('path'); function renameCjs(dir) { const files = fs.readdirSync(dir); for(const file of files) { const fullPath = path.join(dir, file); if(fs.statSync(fullPath).isDirectory()) renameCjs(fullPath); else if(fullPath.endsWith('.js')) { fs.renameSync(fullPath, fullPath.replace('.js', '.cjs')); } } }; renameCjs('./dist/cjs');\"",
+        "build:rename-cjs": "node scripts/fix-cjs.mjs",
+        "dev": "tsc -p tsconfig.build.json --module ESNext --outDir dist/esm --watch",
+        "typecheck": "tsc --noEmit",
         "test": "vitest run --coverage",
+        "test:unit": "vitest run --coverage tests/unit",
+        "test:integration": "vitest run tests/integration",
         "test:watch": "vitest",
+        "test:crash": "vitest run tests/integration/crash-recovery.test.ts",
         "lint": "eslint src/**/*.ts",
+        "format:check": "prettier --check src/**/*.ts tests/**/*.ts",
         "prepare": "npm run build"
     },
     "peerDependencies": {
@@ -40,9 +46,24 @@
         "vitest": "^2.1.8"
     },
     "dependencies": {
-        "nanoid": "^5.0.9"
+        "ulid": "^2.3.0"
     },
     "engines": {
         "node": ">=18.0.0"
-    }
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "CHANGELOG.md"
+    ],
+    "keywords": [
+        "job-queue",
+        "task-queue",
+        "worker",
+        "whatsapp",
+        "node",
+        "no-redis",
+        "priority-queue",
+        "typescript"
+    ]
 }

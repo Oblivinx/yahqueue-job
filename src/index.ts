@@ -1,6 +1,86 @@
-export * from './core/types.js';
-export * from './core/errors.js';
-export * from './core/JobBuilder.js';
-export * from './core/JobQueue.js';
-export * from './adapters/IStorageAdapter.js';
-export * from './adapters/MemoryAdapter.js';
+// ─── Core ─────────────────────────────────────────────────────────────────────
+export { JobQueue } from './core/JobQueue.js';
+export { PriorityHeap } from './core/PriorityHeap.js';
+export { JobRegistry } from './core/JobRegistry.js';
+export { Scheduler } from './core/Scheduler.js';
+export { FlowController } from './core/FlowController.js';
+
+// ─── Job ──────────────────────────────────────────────────────────────────────
+export { createJob, updateJob, isJob } from './job/Job.js';
+export { JobBuilder } from './job/JobBuilder.js';
+export { JobState } from './job/JobState.js';
+export { JobResultFactory } from './job/JobResult.js';
+export { JobBatch } from './job/JobBatch.js';
+
+// ─── Retry ────────────────────────────────────────────────────────────────────
+export { ExponentialBackoff } from './retry/ExponentialBackoff.js';
+export { LinearBackoff } from './retry/LinearBackoff.js';
+export { NoRetry } from './retry/NoRetry.js';
+export { CustomRetry } from './retry/CustomRetry.js';
+export type { IRetryPolicy } from './retry/RetryPolicy.js';
+
+// ─── Adapters ─────────────────────────────────────────────────────────────────
+export { MemoryAdapter } from './adapters/MemoryAdapter.js';
+export { SqliteAdapter } from './adapters/SqliteAdapter.js';
+export { FileAdapter } from './adapters/FileAdapter.js';
+
+// ─── Plugins ──────────────────────────────────────────────────────────────────
+export { RateLimiter } from './plugins/RateLimiter.js';
+export { Deduplicator } from './plugins/Deduplicator.js';
+export { Metrics } from './plugins/Metrics.js';
+export { DeadLetterQueue } from './plugins/DeadLetterQueue.js';
+export { Throttle } from './plugins/Throttle.js';
+export { JobTTL } from './plugins/JobTTL.js';
+
+// ─── Persistence ──────────────────────────────────────────────────────────────
+export { WALWriter } from './persistence/WALWriter.js';
+export { Snapshot } from './persistence/Snapshot.js';
+export { Recovery } from './persistence/Recovery.js';
+
+// ─── Events ───────────────────────────────────────────────────────────────────
+export { TypedEventEmitter } from './events/EventEmitter.js';
+export { QueueEvent } from './events/QueueEvents.js';
+
+// ─── Errors ───────────────────────────────────────────────────────────────────
+export { QueueError } from './errors/QueueError.js';
+export { JobTimeoutError } from './errors/JobTimeoutError.js';
+export { AdapterError } from './errors/AdapterError.js';
+export { RateLimitError } from './errors/RateLimitError.js';
+export { DependencyError, CyclicDependencyError, UnknownJobTypeError } from './errors/DependencyError.js';
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+export { generateId } from './utils/idGenerator.js';
+export { sleep } from './utils/sleep.js';
+export { SystemClock, systemClock } from './utils/clock.js';
+export { ConsoleLogger, NullLogger, defaultLogger } from './utils/logger.js';
+export { CircuitBreaker } from './utils/circuitBreaker.js';
+export { assert } from './utils/assert.js';
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+export { resolveConfig, DEFAULT_WORKER_CONFIG, DEFAULT_PERSISTENCE_CONFIG } from './config/QueueConfig.js';
+export { validateConfig } from './config/validateConfig.js';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+export type {
+    Job,
+    JobState as JobStateType,
+    JobPayload,
+    JobOptions,
+    JobResult,
+    JobSuccess,
+    JobFailure,
+    JobContext,
+    JobHandler,
+} from './types/job.types.js';
+export type {
+    QueueConfig,
+    ResolvedQueueConfig,
+    WorkerConfig,
+    PersistenceConfig,
+    MetricsSnapshot,
+} from './types/queue.types.js';
+export type { IStorageAdapter } from './types/adapter.types.js';
+export type { IPlugin } from './types/plugin.types.js';
+export type { FlowNode, DAGConfig, DAGNode, ChainStep } from './types/flow.types.js';
+export type { IClock } from './utils/clock.js';
+export type { ILogger } from './utils/logger.js';

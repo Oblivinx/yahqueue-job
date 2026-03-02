@@ -1,62 +1,66 @@
+import { PriorityHeap } from '../core/PriorityHeap.js';
+import { AdapterError } from '../errors/AdapterError.js';
+/**
+ * MemoryAdapter — default in-process adapter, zero external dependencies.
+ * Uses PriorityHeap internally for O(log n) priority scheduling.
+ */
 export class MemoryAdapter {
-    items = [];
-    constructor() { }
+    heap = new PriorityHeap();
+    /** Holds jobs in non-pending states (active, done, failed, etc.) */
+    store = new Map();
     async push(job) {
-        this.items.push(job);
-        this.sort();
+        this.heap.insert(job);
     }
     async pop() {
         const now = Date.now();
-        // Find the first job that is ready to run (not delayed, or delay passed)
-        const index = this.items.findIndex(j => (j.status === 'pending' || j.status === 'delayed') && j.runAt <= now);
-        if (index !== -1) {
-            const job = this.items.splice(index, 1)[0];
-            return job;
-        }
-        return null;
+        const job = this.heap.extractMin(now);
+        if (!job)
+            return null;
+        return job;
+    }
+    async peek() {
+        const now = Date.now();
+        const job = this.heap.peekMin(now);
+        if (!job)
+            return null;
+        return job;
     }
     async get(id) {
-        return this.items.find(j => j.id === id) || null;
+        // Check heap-still-pending jobs via toArray
+        const inHeap = this.heap.toArray().find((j) => j.id === id);
+        if (inHeap)
+            return inHeap;
+        return this.store.get(id) ?? null;
     }
     async update(job) {
-        const index = this.items.findIndex(j => j.id === job.id);
-        if (index !== -1) {
-            this.items[index] = job;
-            this.sort();
+        const inHeap = this.heap.toArray().find((j) => j.id === job.id);
+        if (inHeap) {
+            // Still in heap → update in place (e.g. state change while pending)
+            this.heap.update(job);
         }
         else {
-            // If updating an active job that is not in the array (popped earlier), we can add it back if needed, e.g., if it failed.
-            if (job.status !== 'active') {
-                this.items.push(job);
-                this.sort();
-            }
+            this.store.set(job.id, job);
         }
     }
     async remove(id) {
-        this.items = this.items.filter(j => j.id !== id);
+        this.heap.remove(id);
+        this.store.delete(id);
     }
     async size() {
-        return this.items.filter(j => j.status === 'pending' || j.status === 'delayed').length;
+        return this.heap.size;
+    }
+    async getAll() {
+        const fromHeap = this.heap.toArray();
+        const fromStore = Array.from(this.store.values());
+        return [...fromHeap, ...fromStore];
     }
     async clear() {
-        this.items = [];
+        this.heap.clear();
+        this.store.clear();
     }
     async close() {
         await this.clear();
-    }
-    sort() {
-        this.items.sort((a, b) => {
-            // Primary sort: runAt (delayed jobs go later)
-            // Only jobs with runAt <= now should be considered for immediate popping
-            if (a.runAt !== b.runAt) {
-                return a.runAt - b.runAt;
-            }
-            // Secondary sort: priority (lower number = higher priority)
-            if (a.priority !== b.priority) {
-                return a.priority - b.priority;
-            }
-            // Tertiary sort: chronological creation (FIFO for same priority)
-            return a.createdAt - b.createdAt;
-        });
+        // Suppress unused import
+        void AdapterError;
     }
 }
