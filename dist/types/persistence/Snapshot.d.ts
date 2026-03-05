@@ -27,8 +27,9 @@ export declare class Snapshot {
     read(): SnapshotData | null;
     /**
      * Start periodic snapshot schedule.
+     * @param onError - Optional callback to surface snapshot errors (e.g. emit QueueEvent.ERROR)
      */
-    schedule(intervalMs: number, getSeq: () => number): void;
+    schedule(intervalMs: number, getSeq: () => number, onSuccess?: () => void | Promise<void>, onError?: (err: Error) => void): void;
     /** Stop the periodic snapshot timer */
     stop(): void;
     get lastSnapshotSeq(): number;

@@ -25,6 +25,7 @@ export declare class JobQueue {
     private readonly recovery;
     private readonly defaultRetry;
     private activeWorkers;
+    private pendingWorkers;
     private isClosed;
     private isPaused;
     private drainResolvers;

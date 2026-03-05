@@ -26,6 +26,7 @@ export interface QueueConfig {
     defaultPriority?: number;
     defaultMaxAttempts?: number;
     defaultMaxDuration?: number;
+    maxQueueSize?: number;
 }
 /** Resolved (filled-with-defaults) queue configuration */
 export interface ResolvedQueueConfig {
@@ -37,6 +38,7 @@ export interface ResolvedQueueConfig {
     defaultPriority: number;
     defaultMaxAttempts: number;
     defaultMaxDuration: number;
+    maxQueueSize?: number;
 }
 /** Metrics snapshot returned by queue.metrics.snapshot() */
 export interface MetricsSnapshot {

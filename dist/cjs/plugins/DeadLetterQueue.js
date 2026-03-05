@@ -1,3 +1,6 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DeadLetterQueue = void 0;
 /**
  * DeadLetterQueue plugin — captures permanently failed jobs.
  * Provides inspect/retry/purge API.
@@ -8,7 +11,7 @@
  * queue.dlq.list()           // all DLQ entries
  * queue.dlq.retry(jobId)     // re-enqueue a job from DLQ
  */
-export class DeadLetterQueue {
+class DeadLetterQueue {
     name = 'DeadLetterQueue';
     entries = new Map();
     enqueueCallback;
@@ -123,3 +126,4 @@ export class DeadLetterQueue {
         }
     }
 }
+exports.DeadLetterQueue = DeadLetterQueue;

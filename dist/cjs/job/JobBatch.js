@@ -1,3 +1,6 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.JobBatch = void 0;
 /**
  * JobBatch — group jobs and await completion using all/any semantics.
  *
@@ -6,7 +9,7 @@
  * for (const id of jobIds) batch.add(id);
  * const results = await batch.awaitAll(); // Wait for every job in the batch
  */
-export class JobBatch {
+class JobBatch {
     pending = new Map();
     /**
      * Register a job ID to track in this batch.
@@ -74,3 +77,4 @@ export class JobBatch {
         return Promise.any(promises);
     }
 }
+exports.JobBatch = JobBatch;

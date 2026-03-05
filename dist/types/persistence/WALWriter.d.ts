@@ -1,4 +1,4 @@
-export type WALOperation = 'ENQUEUE' | 'ACTIVATE' | 'COMPLETE' | 'FAIL' | 'RETRY' | 'EXPIRE' | 'DLQ';
+export type WALOperation = 'ENQUEUE' | 'ACTIVATE' | 'COMPLETE' | 'FAIL' | 'RETRY' | 'EXPIRE' | 'DLQ' | 'CHAIN_REGISTER' | 'CHAIN_ADVANCE' | 'CHAIN_COMPLETE' | 'DAG_REGISTER' | 'DAG_COMPLETE_DEP' | 'DLQ_ADD' | 'DLQ_REMOVE';
 export interface WALEntry {
     seq: number;
     op: WALOperation;
@@ -14,6 +14,7 @@ export declare class WALWriter {
     private readonly walPath;
     private seq;
     private enabled;
+    private stream;
     constructor(walPath: string, enabled?: boolean);
     /**
      * Initialize: ensure directory exists & read current sequence number.
@@ -34,6 +35,10 @@ export declare class WALWriter {
     /**
      * Truncate the WAL (called after snapshot is persisted).
      */
-    truncate(): void;
+    truncate(): Promise<void>;
+    /**
+     * Close the stream gracefully
+     */
+    close(): Promise<void>;
     get currentSeq(): number;
 }

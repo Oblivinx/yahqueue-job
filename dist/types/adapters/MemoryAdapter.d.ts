@@ -8,6 +8,7 @@ export declare class MemoryAdapter implements IStorageAdapter {
     private readonly heap;
     /** Holds jobs in non-pending states (active, done, failed, etc.) */
     private readonly store;
+    private readonly pendingIndex;
     push<T extends JobPayload>(job: Job<T>): Promise<void>;
     pop<T extends JobPayload>(): Promise<Job<T> | null>;
     peek<T extends JobPayload>(): Promise<Job<T> | null>;

@@ -1,5 +1,8 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.defaultLogger = exports.NullLogger = exports.ConsoleLogger = void 0;
 /** Default logger backed by console — zero external dependencies */
-export class ConsoleLogger {
+class ConsoleLogger {
     prefix;
     constructor(prefix = '[wa-job-queue]') {
         this.prefix = prefix;
@@ -29,12 +32,14 @@ export class ConsoleLogger {
         console.error(this.format('error', message, serializableArgs));
     }
 }
+exports.ConsoleLogger = ConsoleLogger;
 /** Null logger — discards all output. Useful for production opt-out. */
-export class NullLogger {
+class NullLogger {
     debug(_message, ..._args) { }
     info(_message, ..._args) { }
     warn(_message, ..._args) { }
     error(_message, ..._args) { }
 }
+exports.NullLogger = NullLogger;
 /** Singleton default logger */
-export const defaultLogger = new ConsoleLogger();
+exports.defaultLogger = new ConsoleLogger();

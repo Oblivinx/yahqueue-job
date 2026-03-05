@@ -1,5 +1,9 @@
-import { MemoryAdapter } from '../adapters/MemoryAdapter.js';
-export const DEFAULT_WORKER_CONFIG = {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_PERSISTENCE_CONFIG = exports.DEFAULT_WORKER_CONFIG = void 0;
+exports.resolveConfig = resolveConfig;
+const MemoryAdapter_js_1 = require("../adapters/MemoryAdapter.js");
+exports.DEFAULT_WORKER_CONFIG = {
     min: 1,
     max: 10,
     scaleUpThreshold: 5,
@@ -7,7 +11,7 @@ export const DEFAULT_WORKER_CONFIG = {
     scaleUpStep: 2,
     monitorIntervalMs: 1_000,
 };
-export const DEFAULT_PERSISTENCE_CONFIG = {
+exports.DEFAULT_PERSISTENCE_CONFIG = {
     walPath: './wa-queue.wal',
     snapshotPath: './wa-queue.snapshot.json',
     snapshotIntervalMs: 60_000,
@@ -16,16 +20,16 @@ export const DEFAULT_PERSISTENCE_CONFIG = {
 /**
  * Resolve user-supplied QueueConfig with defaults.
  */
-export function resolveConfig(config) {
+function resolveConfig(config) {
     return {
         name: config.name,
-        adapter: config.adapter ?? new MemoryAdapter(),
+        adapter: config.adapter ?? new MemoryAdapter_js_1.MemoryAdapter(),
         workers: {
-            ...DEFAULT_WORKER_CONFIG,
+            ...exports.DEFAULT_WORKER_CONFIG,
             ...config.workers,
         },
         persistence: {
-            ...DEFAULT_PERSISTENCE_CONFIG,
+            ...exports.DEFAULT_PERSISTENCE_CONFIG,
             ...config.persistence,
         },
         plugins: config.plugins ?? [],

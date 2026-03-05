@@ -31,6 +31,7 @@
   - [JobTTL](#jobttl)
   - [DeadLetterQueue](#deadletterqueue)
   - [Metrics](#metrics)
+  - [JobTracePlugin](#jobtraceplugin)
 - [Retry Policies](#retry-policies)
   - [ExponentialBackoff](#exponentialbackoff)
   - [LinearBackoff](#linearbackoff)
@@ -48,6 +49,7 @@
 - [Utilities](#utilities)
   - [CircuitBreaker](#circuitbreaker)
   - [Logger](#logger)
+  - [JobBatch](#jobbatch)
 - [Error Reference](#error-reference)
 - [TypeScript Types Reference](#typescript-types-reference)
 - [API Reference](#api-reference)
@@ -61,7 +63,7 @@
 | 🚫 **No Redis Required** | Uses `better-sqlite3` (optional) or in-memory heap — zero infra cost |
 | ⚡ **Priority Queue** | O(log n) binary heap — higher-priority jobs always run first |
 | 🔀 **Multi-Process Sharding** | Built-in `IpcRouter` + `IpcWorker` for routing jobs to child processes |
-| 🔌 **Plugin Ecosystem** | `RateLimiter`, `Throttle`, `Deduplicator`, `Debounce`, `JobTTL`, `DeadLetterQueue`, `Metrics` |
+| 🔌 **Plugin Ecosystem** | `RateLimiter`, `Throttle`, `Deduplicator`, `Debounce`, `JobTTL`, `DeadLetterQueue`, `Metrics`, `JobTracePlugin` |
 | 🔁 **Retry Policies** | `ExponentialBackoff`, `LinearBackoff`, `CustomRetry`, `NoRetry` |
 | 🔗 **Flow Control** | Sequential Chains and complex DAGs with dependency resolution |
 | 💾 **Crash Recovery** | WAL + Snapshot persistence, auto-recovered on restart |
@@ -467,6 +469,19 @@ const snap = metrics.snapshot(await adapter.size());
 metrics.reset(); // reset all counters
 ```
 
+### JobTracePlugin
+
+Provides out-of-the-box structured JSON logging for the entire job lifecycle.
+
+```typescript
+import { JobTracePlugin } from 'wa-job-queue';
+
+const queue = new JobQueue({
+    name: 'q',
+    plugins: [new JobTracePlugin()],
+});
+```
+
 ---
 
 ## Retry Policies
@@ -859,6 +874,23 @@ class PinoLogger implements ILogger {
 }
 ```
 
+### JobBatch
+
+Group jobs and await completion using all/any semantics.
+
+```typescript
+import { JobBatch } from 'wa-job-queue';
+
+const batch = new JobBatch();
+for (const id of jobIds) batch.track(id);
+
+// Wait for ALL jobs in the batch to settle
+const results = await batch.awaitAll();
+
+// Or wait for the FIRST job to complete successfully
+const first = await batch.awaitAny();
+```
+
 ---
 
 ## Error Reference
@@ -984,6 +1016,7 @@ queue.register('send-message', handler);
 | `resume` | `() => void` | Resume processing |
 | `drain` | `() => Promise<void>` | Wait for all active jobs to complete |
 | `shutdown` | `() => Promise<void>` | Graceful shutdown |
+| `runInProcess` | `(type, payload, options?) => Promise<R>` | Run a job handler directly in-process, bypassing the queue entirely |
 | `on` | `(event, listener) => this` | Subscribe to an event |
 | `once` | `(event, listener) => this` | Subscribe once |
 | `off` | `(event, listener) => this` | Unsubscribe |

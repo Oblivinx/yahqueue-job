@@ -1,7 +1,10 @@
-import { createJob, updateJob } from '../job/Job.js';
-import { JobState } from '../job/JobState.js';
-import { CyclicDependencyError } from '../errors/DependencyError.js';
-import { generateId } from '../utils/idGenerator.js';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FlowController = void 0;
+const Job_js_1 = require("../job/Job.js");
+const JobState_js_1 = require("../job/JobState.js");
+const DependencyError_js_1 = require("../errors/DependencyError.js");
+const idGenerator_js_1 = require("../utils/idGenerator.js");
 const DAG_DEFAULTS = {
     defaultPriority: 5,
     defaultMaxAttempts: 3,
@@ -10,7 +13,7 @@ const DAG_DEFAULTS = {
 /**
  * FlowController — manages job chaining (A→B→C) and DAG dependency graphs.
  */
-export class FlowController {
+class FlowController {
     adapter;
     // feat: optional WAL reference for persisting chain/DAG state
     wal;
@@ -31,7 +34,7 @@ export class FlowController {
         this.wal = wal;
         this.onJobPushed = onJobPushed;
         // Suppress unused import warning
-        void JobState;
+        void JobState_js_1.JobState;
     }
     /**
      * Enqueue a simple ordered chain: A → B → C
@@ -39,10 +42,10 @@ export class FlowController {
      */
     async chain(steps) {
         if (steps.length === 0)
-            return generateId();
-        const flowId = generateId();
+            return (0, idGenerator_js_1.generateId)();
+        const flowId = (0, idGenerator_js_1.generateId)();
         const firstStep = steps[0];
-        const job = createJob({ ...firstStep, flowId }, DAG_DEFAULTS);
+        const job = (0, Job_js_1.createJob)({ ...firstStep, flowId }, DAG_DEFAULTS);
         this.chainMap.set(flowId, { steps, currentIndex: 0 });
         // feat: persist chain registration so it survives crashes
         this.wal?.append('CHAIN_REGISTER', flowId, { steps, currentIndex: 0 });
@@ -84,7 +87,7 @@ export class FlowController {
      * Returns flowId.
      */
     async dag(config) {
-        const flowId = generateId();
+        const flowId = (0, idGenerator_js_1.generateId)();
         const nodeIds = Object.keys(config.nodes);
         const inDegree = new Map();
         const adj = new Map();
@@ -116,10 +119,10 @@ export class FlowController {
             }
         }
         if (order.length !== nodeIds.length) {
-            throw new CyclicDependencyError(nodeIds);
+            throw new DependencyError_js_1.CyclicDependencyError(nodeIds);
         }
         for (const [id, node] of Object.entries(config.nodes)) {
-            const jobId = generateId();
+            const jobId = (0, idGenerator_js_1.generateId)();
             const dagNode = {
                 id,
                 jobId,
@@ -147,8 +150,8 @@ export class FlowController {
         for (const [id, node] of Object.entries(config.nodes)) {
             if ((node.dependsOn ?? []).length === 0) {
                 const dagNode = this.dagNodes.get(id);
-                const job = createJob({ ...node, flowId, dependsOn: [] }, DAG_DEFAULTS);
-                const remapped = updateJob(job, { flowId });
+                const job = (0, Job_js_1.createJob)({ ...node, flowId, dependsOn: [] }, DAG_DEFAULTS);
+                const remapped = (0, Job_js_1.updateJob)(job, { flowId });
                 // fix: update reverse map to point at the remapped job id
                 this.jobToNode.delete(dagNode.jobId);
                 this.jobToNode.set(remapped.id, id);
@@ -237,7 +240,7 @@ export class FlowController {
         flow.currentIndex = nextIndex;
         // feat: persist chain advancement for recovery
         this.wal?.append('CHAIN_ADVANCE', flowId, { currentIndex: nextIndex });
-        const job = createJob({ ...nextStep, flowId }, DAG_DEFAULTS);
+        const job = (0, Job_js_1.createJob)({ ...nextStep, flowId }, DAG_DEFAULTS);
         await this.adapter.push(job);
         // fix: wake up idle workers for each chain step advanced
         this.onJobPushed();
@@ -257,7 +260,7 @@ export class FlowController {
                     completedJobId: completedNodeId,
                 });
                 if (dagNode.completedDeps.size === dagNode.deps.length) {
-                    const job = createJob({ type: dagNode.type, payload: {}, flowId: nodeId }, DAG_DEFAULTS);
+                    const job = (0, Job_js_1.createJob)({ type: dagNode.type, payload: {}, flowId: nodeId }, DAG_DEFAULTS);
                     this.dagNodes.delete(nodeId);
                     this.nodeToJob.delete(nodeId);
                     // fix: register the newly created job in the reverse map before pushing
@@ -289,3 +292,4 @@ export class FlowController {
         }
     }
 }
+exports.FlowController = FlowController;

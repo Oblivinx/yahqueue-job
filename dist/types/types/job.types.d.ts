@@ -21,6 +21,7 @@ export interface Job<T extends JobPayload = JobPayload> {
     readonly lastError?: string;
     readonly flowId?: string;
     readonly dependsOn?: string[];
+    readonly idempotencyKey?: string;
     /**
      * Per-job retry policy. Overrides the queue's default retry policy.
      * Not serialized/persisted — after crash recovery jobs fall back to the queue default.
@@ -39,6 +40,7 @@ export interface JobOptions<T extends JobPayload = JobPayload> {
     shardKey?: string;
     flowId?: string;
     dependsOn?: string[];
+    idempotencyKey?: string;
     /**
      * Override the default retry policy for this specific job.
      * Takes precedence over the queue-level default.

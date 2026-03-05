@@ -1,15 +1,18 @@
-import { QueueError } from '../errors/QueueError.js';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Deduplicator = void 0;
+const QueueError_js_1 = require("../errors/QueueError.js");
 /**
  * Deduplicator plugin — prevents duplicate job IDs from entering the queue.
  * Removes the ID from the set after job completes (allows re-enqueue).
  */
-export class Deduplicator {
+class Deduplicator {
     name = 'Deduplicator';
     active = new Set();
     onEnqueue(job) {
         const key = job.idempotencyKey ?? job.id;
         if (this.active.has(key)) {
-            throw new QueueError(`Duplicate job: "${key}" is already in the queue`);
+            throw new QueueError_js_1.QueueError(`Duplicate job: "${key}" is already in the queue`);
         }
         this.active.add(key);
     }
@@ -30,3 +33,4 @@ export class Deduplicator {
         return this.active.size;
     }
 }
+exports.Deduplicator = Deduplicator;

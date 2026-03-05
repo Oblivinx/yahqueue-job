@@ -1,26 +1,29 @@
-import { createJob, updateJob } from '../job/Job.js';
-import { JobState } from '../job/JobState.js';
-import { JobResultFactory } from '../job/JobResult.js';
-import { JobRegistry } from './JobRegistry.js';
-import { Scheduler } from './Scheduler.js';
-import { FlowController } from './FlowController.js';
-import { TypedEventEmitter } from '../events/EventEmitter.js';
-import { QueueEvent } from '../events/QueueEvents.js';
-import { ExponentialBackoff } from '../retry/ExponentialBackoff.js';
-import { WALWriter } from '../persistence/WALWriter.js';
-import { Snapshot } from '../persistence/Snapshot.js';
-import { Recovery } from '../persistence/Recovery.js';
-import { validateConfig } from '../config/validateConfig.js';
-import { resolveConfig } from '../config/QueueConfig.js';
-import { AdapterError } from '../errors/AdapterError.js';
-import { QueueError } from '../errors/QueueError.js';
-import { JobTimeoutError } from '../errors/JobTimeoutError.js';
-import { DiscardJobError } from '../errors/DiscardJobError.js';
-import { Metrics } from '../plugins/Metrics.js';
-import { DeadLetterQueue } from '../plugins/DeadLetterQueue.js';
-import { JobTTL } from '../plugins/JobTTL.js';
-import { systemClock } from '../utils/clock.js';
-import { sleep } from '../utils/sleep.js';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.JobQueue = void 0;
+const Job_js_1 = require("../job/Job.js");
+const JobState_js_1 = require("../job/JobState.js");
+const JobResult_js_1 = require("../job/JobResult.js");
+const JobRegistry_js_1 = require("./JobRegistry.js");
+const Scheduler_js_1 = require("./Scheduler.js");
+const FlowController_js_1 = require("./FlowController.js");
+const EventEmitter_js_1 = require("../events/EventEmitter.js");
+const QueueEvents_js_1 = require("../events/QueueEvents.js");
+const ExponentialBackoff_js_1 = require("../retry/ExponentialBackoff.js");
+const WALWriter_js_1 = require("../persistence/WALWriter.js");
+const Snapshot_js_1 = require("../persistence/Snapshot.js");
+const Recovery_js_1 = require("../persistence/Recovery.js");
+const validateConfig_js_1 = require("../config/validateConfig.js");
+const QueueConfig_js_1 = require("../config/QueueConfig.js");
+const AdapterError_js_1 = require("../errors/AdapterError.js");
+const QueueError_js_1 = require("../errors/QueueError.js");
+const JobTimeoutError_js_1 = require("../errors/JobTimeoutError.js");
+const DiscardJobError_js_1 = require("../errors/DiscardJobError.js");
+const Metrics_js_1 = require("../plugins/Metrics.js");
+const DeadLetterQueue_js_1 = require("../plugins/DeadLetterQueue.js");
+const JobTTL_js_1 = require("../plugins/JobTTL.js");
+const clock_js_1 = require("../utils/clock.js");
+const sleep_js_1 = require("../utils/sleep.js");
 /**
  * JobQueue — the main orchestrator.
  *
@@ -30,12 +33,12 @@ import { sleep } from '../utils/sleep.js';
  * await queue.initialize();
  * const id = await queue.enqueue({ type: 'sendMessage', payload: { ... } });
  */
-export class JobQueue {
+class JobQueue {
     cfg;
-    registry = new JobRegistry();
+    registry = new JobRegistry_js_1.JobRegistry();
     scheduler;
     flowController;
-    emitter = new TypedEventEmitter();
+    emitter = new EventEmitter_js_1.TypedEventEmitter();
     wal;
     snapshot;
     recovery;
@@ -48,30 +51,30 @@ export class JobQueue {
     drainResolvers = [];
     workers = new Set();
     constructor(config) {
-        validateConfig(config);
-        this.cfg = resolveConfig(config);
-        this.scheduler = new Scheduler(systemClock);
-        this.defaultRetry = new ExponentialBackoff({
+        (0, validateConfig_js_1.validateConfig)(config);
+        this.cfg = (0, QueueConfig_js_1.resolveConfig)(config);
+        this.scheduler = new Scheduler_js_1.Scheduler(clock_js_1.systemClock);
+        this.defaultRetry = new ExponentialBackoff_js_1.ExponentialBackoff({
             maxAttempts: this.cfg.defaultMaxAttempts,
         });
         // fix: initialize WAL first so it can be passed to FlowController
-        this.wal = new WALWriter(this.cfg.persistence.walPath, this.cfg.persistence.enabled);
+        this.wal = new WALWriter_js_1.WALWriter(this.cfg.persistence.walPath, this.cfg.persistence.enabled);
         // feat: pass wal to FlowController so chain/DAG state is persisted across crashes
         // fix: pass triggerWorker callback so chain/DAG adapter pushes wake up idle workers
-        this.flowController = new FlowController(this.cfg.adapter, this.wal, () => this.triggerWorker());
-        this.snapshot = new Snapshot(this.cfg.persistence.snapshotPath, this.cfg.adapter);
-        this.recovery = new Recovery(this.wal, this.snapshot, this.cfg.adapter);
+        this.flowController = new FlowController_js_1.FlowController(this.cfg.adapter, this.wal, () => this.triggerWorker());
+        this.snapshot = new Snapshot_js_1.Snapshot(this.cfg.persistence.snapshotPath, this.cfg.adapter);
+        this.recovery = new Recovery_js_1.Recovery(this.wal, this.snapshot, this.cfg.adapter);
         // Wire JobTTL expire callback
-        const ttlPlugin = this.cfg.plugins.find((p) => p instanceof JobTTL);
+        const ttlPlugin = this.cfg.plugins.find((p) => p instanceof JobTTL_js_1.JobTTL);
         if (ttlPlugin) {
             ttlPlugin.onExpireCallback((job) => {
                 this.handleExpire(job).catch((err) => {
-                    this.emitter.emit(QueueEvent.ERROR, err instanceof Error ? err : new QueueError(String(err)));
+                    this.emitter.emit(QueueEvents_js_1.QueueEvent.ERROR, err instanceof Error ? err : new QueueError_js_1.QueueError(String(err)));
                 });
             });
         }
         // Wire DLQ enqueue callback + WAL for persistence
-        const dlqPlugin = this.cfg.plugins.find((p) => p instanceof DeadLetterQueue);
+        const dlqPlugin = this.cfg.plugins.find((p) => p instanceof DeadLetterQueue_js_1.DeadLetterQueue);
         if (dlqPlugin) {
             dlqPlugin.setEnqueueCallback(async (job) => {
                 await this.cfg.adapter.push(job);
@@ -87,7 +90,7 @@ export class JobQueue {
             this.cfg.adapter.push(job).then(() => {
                 this.triggerWorker();
             }).catch((err) => {
-                this.emitter.emit(QueueEvent.ERROR, err instanceof Error ? err : new AdapterError('Scheduler push failed', err));
+                this.emitter.emit(QueueEvents_js_1.QueueEvent.ERROR, err instanceof Error ? err : new AdapterError_js_1.AdapterError('Scheduler push failed', err));
             });
         });
     }
@@ -115,16 +118,16 @@ export class JobQueue {
             // feat: restore FlowController chain/DAG state and DLQ entries from WAL
             const walEntries = this.wal.readAll();
             this.flowController.restoreFromWAL(walEntries);
-            const dlqPlugin = this.cfg.plugins.find((p) => p instanceof DeadLetterQueue);
+            const dlqPlugin = this.cfg.plugins.find((p) => p instanceof DeadLetterQueue_js_1.DeadLetterQueue);
             dlqPlugin?.restoreFromWAL(walEntries);
             this.snapshot.schedule(this.cfg.persistence.snapshotIntervalMs, () => this.wal.currentSeq, () => {
                 this.wal.truncate().catch((err) => {
-                    this.emitter.emit(QueueEvent.ERROR, err instanceof Error ? err : new QueueError(String(err)));
+                    this.emitter.emit(QueueEvents_js_1.QueueEvent.ERROR, err instanceof Error ? err : new QueueError_js_1.QueueError(String(err)));
                 });
             }, 
             // fix: surface snapshot errors instead of swallowing them silently
             (err) => {
-                this.emitter.emit(QueueEvent.ERROR, err);
+                this.emitter.emit(QueueEvents_js_1.QueueEvent.ERROR, err);
             });
         }
         this.startWorkers();
@@ -143,10 +146,10 @@ export class JobQueue {
         if (this.cfg.maxQueueSize !== undefined) {
             const currentSize = await this.size();
             if (currentSize >= this.cfg.maxQueueSize) {
-                throw new QueueError(`Queue is full (maxQueueSize: ${this.cfg.maxQueueSize}). Backpressure applied.`);
+                throw new QueueError_js_1.QueueError(`Queue is full (maxQueueSize: ${this.cfg.maxQueueSize}). Backpressure applied.`);
             }
         }
-        const job = createJob(options, {
+        const job = (0, Job_js_1.createJob)(options, {
             defaultPriority: this.cfg.defaultPriority,
             defaultMaxAttempts: this.cfg.defaultMaxAttempts,
             defaultMaxDuration: this.cfg.defaultMaxDuration,
@@ -156,7 +159,7 @@ export class JobQueue {
             if (plugin.onEnqueue)
                 await plugin.onEnqueue(job);
         }
-        if (job.runAt > systemClock.now()) {
+        if (job.runAt > clock_js_1.systemClock.now()) {
             // Delayed job: go through scheduler
             this.scheduler.schedule(job, job.runAt);
         }
@@ -167,7 +170,7 @@ export class JobQueue {
             }
             this.triggerWorker();
         }
-        this.emitter.emit(QueueEvent.ENQUEUED, job);
+        this.emitter.emit(QueueEvents_js_1.QueueEvent.ENQUEUED, job);
         return job.id;
     }
     /** Enqueue a linear chain of jobs (A → B → C) */
@@ -214,7 +217,7 @@ export class JobQueue {
             await this.wal.close();
         }
         // Clear JobTTL timers
-        const ttlPlugin = this.cfg.plugins.find((p) => p instanceof JobTTL);
+        const ttlPlugin = this.cfg.plugins.find((p) => p instanceof JobTTL_js_1.JobTTL);
         ttlPlugin?.clear();
         this.emitter.removeAllListeners();
     }
@@ -245,7 +248,7 @@ export class JobQueue {
      */
     async runInProcess(type, payload, options) {
         this.checkOpen();
-        const job = createJob({ type, payload, ...options }, {
+        const job = (0, Job_js_1.createJob)({ type, payload, ...options }, {
             defaultPriority: this.cfg.defaultPriority,
             defaultMaxAttempts: this.cfg.defaultMaxAttempts,
             defaultMaxDuration: this.cfg.defaultMaxDuration,
@@ -269,7 +272,7 @@ export class JobQueue {
             const maxDuration = options?.maxDuration ?? this.cfg.defaultMaxDuration;
             const timeoutPromise = new Promise((_, reject) => {
                 timeoutId = setTimeout(() => {
-                    const err = new JobTimeoutError(job.id, maxDuration);
+                    const err = new JobTimeoutError_js_1.JobTimeoutError(job.id, maxDuration);
                     abortController.abort(err);
                     reject(err);
                 }, maxDuration);
@@ -280,37 +283,37 @@ export class JobQueue {
             ]).finally(() => clearTimeout(timeoutId));
         }
         catch (err) {
-            const error = err instanceof Error ? err : new QueueError(String(err));
-            const result = JobResultFactory.failure(error);
-            const failedJob = updateJob(job, {
-                state: JobState.FAILED,
+            const error = err instanceof Error ? err : new QueueError_js_1.QueueError(String(err));
+            const result = JobResult_js_1.JobResultFactory.failure(error);
+            const failedJob = (0, Job_js_1.updateJob)(job, {
+                state: JobState_js_1.JobState.FAILED,
                 attempts: 1,
                 lastError: error.message,
-                finishedAt: systemClock.now(),
+                finishedAt: clock_js_1.systemClock.now(),
             });
             for (const plugin of this.cfg.plugins) {
                 if (plugin.onFail)
                     await plugin.onFail(failedJob, error);
             }
-            this.emitter.emit(QueueEvent.FAILED, failedJob, error);
+            this.emitter.emit(QueueEvents_js_1.QueueEvent.FAILED, failedJob, error);
             throw err;
         }
-        const result = JobResultFactory.success(handlerResult);
-        const doneJob = updateJob(job, {
-            state: JobState.DONE,
+        const result = JobResult_js_1.JobResultFactory.success(handlerResult);
+        const doneJob = (0, Job_js_1.updateJob)(job, {
+            state: JobState_js_1.JobState.DONE,
             attempts: 1,
-            finishedAt: systemClock.now(),
+            finishedAt: clock_js_1.systemClock.now(),
         });
         for (const plugin of this.cfg.plugins) {
             if (plugin.onComplete)
                 await plugin.onComplete(doneJob, result);
         }
-        this.emitter.emit(QueueEvent.COMPLETED, doneJob, result);
+        this.emitter.emit(QueueEvents_js_1.QueueEvent.COMPLETED, doneJob, result);
         return handlerResult;
     }
     /** Get metrics snapshot */
     get metrics() {
-        const metricsPlugin = this.cfg.plugins.find((p) => p instanceof Metrics);
+        const metricsPlugin = this.cfg.plugins.find((p) => p instanceof Metrics_js_1.Metrics);
         return {
             snapshot: (depth) => {
                 if (metricsPlugin)
@@ -329,9 +332,9 @@ export class JobQueue {
     }
     /** Get the DeadLetterQueue plugin if configured */
     get dlq() {
-        const plugin = this.cfg.plugins.find((p) => p instanceof DeadLetterQueue);
+        const plugin = this.cfg.plugins.find((p) => p instanceof DeadLetterQueue_js_1.DeadLetterQueue);
         if (!plugin)
-            throw new QueueError('DeadLetterQueue plugin is not configured');
+            throw new QueueError_js_1.QueueError('DeadLetterQueue plugin is not configured');
         return plugin;
     }
     // ─── Worker pool ──────────────────────────────────────────────────────────────
@@ -360,7 +363,7 @@ export class JobQueue {
         this.pendingWorkers = Math.max(0, this.pendingWorkers - 1);
         while (!this.isClosed) {
             if (this.isPaused) {
-                await sleep(50);
+                await (0, sleep_js_1.sleep)(50);
                 continue;
             }
             const processed = await this.processNext();
@@ -377,7 +380,7 @@ export class JobQueue {
             job = await this.cfg.adapter.pop();
         }
         catch (err) {
-            this.emitter.emit(QueueEvent.ERROR, new AdapterError('Failed to pop job', err));
+            this.emitter.emit(QueueEvents_js_1.QueueEvent.ERROR, new AdapterError_js_1.AdapterError('Failed to pop job', err));
             return false;
         }
         if (!job)
@@ -390,7 +393,7 @@ export class JobQueue {
             }
         }
         catch (err) {
-            if (DiscardJobError.is(err)) {
+            if (DiscardJobError_js_1.DiscardJobError.is(err)) {
                 // Plugin requested silent discard — drop job, do NOT re-queue
                 // fix: return true so the worker keeps looping — the job was consumed
                 // from the adapter and there may be more jobs waiting
@@ -401,12 +404,12 @@ export class JobQueue {
             return false;
         }
         this.activeWorkers += 1;
-        const activeJob = updateJob(job, { state: JobState.ACTIVE, startedAt: systemClock.now() });
+        const activeJob = (0, Job_js_1.updateJob)(job, { state: JobState_js_1.JobState.ACTIVE, startedAt: clock_js_1.systemClock.now() });
         await this.cfg.adapter.update(activeJob).catch(() => { });
         if (this.cfg.persistence.enabled) {
             this.wal.append('ACTIVATE', activeJob.id);
         }
-        this.emitter.emit(QueueEvent.ACTIVE, activeJob);
+        this.emitter.emit(QueueEvents_js_1.QueueEvent.ACTIVE, activeJob);
         await this.executeJob(activeJob);
         this.activeWorkers = Math.max(0, this.activeWorkers - 1);
         return true;
@@ -420,7 +423,7 @@ export class JobQueue {
             let timeoutId;
             const timeoutPromise = new Promise((_, reject) => {
                 timeoutId = setTimeout(() => {
-                    const err = new JobTimeoutError(job.id, job.maxDuration);
+                    const err = new JobTimeoutError_js_1.JobTimeoutError(job.id, job.maxDuration);
                     abortController.abort(err);
                     reject(err);
                 }, job.maxDuration);
@@ -430,11 +433,11 @@ export class JobQueue {
                 handler(job.payload, ctx),
                 timeoutPromise,
             ]).finally(() => clearTimeout(timeoutId));
-            result = JobResultFactory.success(handlerResult);
+            result = JobResult_js_1.JobResultFactory.success(handlerResult);
         }
         catch (err) {
-            const error = err instanceof Error ? err : new QueueError(String(err));
-            result = JobResultFactory.failure(error);
+            const error = err instanceof Error ? err : new QueueError_js_1.QueueError(String(err));
+            result = JobResult_js_1.JobResultFactory.failure(error);
         }
         if (result.ok) {
             await this.onSuccess(job, result);
@@ -444,9 +447,9 @@ export class JobQueue {
         }
     }
     async onSuccess(job, result) {
-        const doneJob = updateJob(job, {
-            state: JobState.DONE,
-            finishedAt: systemClock.now(),
+        const doneJob = (0, Job_js_1.updateJob)(job, {
+            state: JobState_js_1.JobState.DONE,
+            finishedAt: clock_js_1.systemClock.now(),
             attempts: job.attempts + 1,
         });
         await this.cfg.adapter.update(doneJob).catch(() => { });
@@ -458,7 +461,7 @@ export class JobQueue {
                 await plugin.onComplete(doneJob, result);
         }
         await this.flowController.onJobComplete(doneJob);
-        this.emitter.emit(QueueEvent.COMPLETED, doneJob, result);
+        this.emitter.emit(QueueEvents_js_1.QueueEvent.COMPLETED, doneJob, result);
         this.triggerWorker();
     }
     async onFailure(job, error) {
@@ -467,11 +470,11 @@ export class JobQueue {
         const retryPolicy = job.retryPolicy ?? this.defaultRetry;
         if (attempts < job.maxAttempts && retryPolicy.shouldRetry(attempts, error)) {
             const delay = retryPolicy.nextDelay(attempts, error);
-            const retryJob = updateJob(job, {
-                state: JobState.RETRYING,
+            const retryJob = (0, Job_js_1.updateJob)(job, {
+                state: JobState_js_1.JobState.RETRYING,
                 attempts,
                 lastError: error.message,
-                runAt: systemClock.now() + delay,
+                runAt: clock_js_1.systemClock.now() + delay,
             });
             if (delay > 0) {
                 this.scheduler.schedule(retryJob, retryJob.runAt);
@@ -482,17 +485,17 @@ export class JobQueue {
             if (this.cfg.persistence.enabled) {
                 this.wal.append('RETRY', retryJob.id);
             }
-            const metricsPlugin = this.cfg.plugins.find((p) => p instanceof Metrics);
+            const metricsPlugin = this.cfg.plugins.find((p) => p instanceof Metrics_js_1.Metrics);
             metricsPlugin?.recordRetry();
-            this.emitter.emit(QueueEvent.RETRYING, retryJob, attempts);
+            this.emitter.emit(QueueEvents_js_1.QueueEvent.RETRYING, retryJob, attempts);
         }
         else {
             // Permanent failure
-            const failedJob = updateJob(job, {
-                state: JobState.FAILED,
+            const failedJob = (0, Job_js_1.updateJob)(job, {
+                state: JobState_js_1.JobState.FAILED,
                 attempts,
                 lastError: error.message,
-                finishedAt: systemClock.now(),
+                finishedAt: clock_js_1.systemClock.now(),
             });
             await this.cfg.adapter.update(failedJob).catch(() => { });
             if (this.cfg.persistence.enabled) {
@@ -503,13 +506,13 @@ export class JobQueue {
                     await plugin.onFail(failedJob, error);
             }
             this.flowController.onJobFail(failedJob);
-            this.emitter.emit(QueueEvent.DEAD_LETTER, failedJob, error);
-            this.emitter.emit(QueueEvent.FAILED, failedJob, error);
+            this.emitter.emit(QueueEvents_js_1.QueueEvent.DEAD_LETTER, failedJob, error);
+            this.emitter.emit(QueueEvents_js_1.QueueEvent.FAILED, failedJob, error);
         }
         this.triggerWorker();
     }
     async handleExpire(job) {
-        const expired = updateJob(job, { state: JobState.EXPIRED });
+        const expired = (0, Job_js_1.updateJob)(job, { state: JobState_js_1.JobState.EXPIRED });
         await this.cfg.adapter.remove(job.id).catch(() => { });
         if (this.cfg.persistence.enabled) {
             this.wal.append('EXPIRE', job.id);
@@ -518,11 +521,11 @@ export class JobQueue {
             if (plugin.onExpire)
                 await plugin.onExpire(expired);
         }
-        this.emitter.emit(QueueEvent.EXPIRED, expired);
+        this.emitter.emit(QueueEvents_js_1.QueueEvent.EXPIRED, expired);
     }
     checkOpen() {
         if (this.isClosed)
-            throw new QueueError('JobQueue is closed');
+            throw new QueueError_js_1.QueueError('JobQueue is closed');
     }
     checkDrain() {
         // fix: also check scheduler (delayed retries) and pendingWorkers (spawned-but-not-yet-active)
@@ -537,5 +540,6 @@ export class JobQueue {
         }
     }
     // Keep imports alive
-    static _imports = { sleep, AdapterError, QueueError, JobTimeoutError, DiscardJobError };
+    static _imports = { sleep: sleep_js_1.sleep, AdapterError: AdapterError_js_1.AdapterError, QueueError: QueueError_js_1.QueueError, JobTimeoutError: JobTimeoutError_js_1.JobTimeoutError, DiscardJobError: DiscardJobError_js_1.DiscardJobError };
 }
+exports.JobQueue = JobQueue;

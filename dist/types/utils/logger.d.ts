@@ -12,6 +12,7 @@ export interface ILogger {
 export declare class ConsoleLogger implements ILogger {
     private readonly prefix;
     constructor(prefix?: string);
+    private format;
     debug(message: string, ...args: unknown[]): void;
     info(message: string, ...args: unknown[]): void;
     warn(message: string, ...args: unknown[]): void;

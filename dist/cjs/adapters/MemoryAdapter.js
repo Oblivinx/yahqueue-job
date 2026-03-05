@@ -1,11 +1,14 @@
-import { PriorityHeap } from '../core/PriorityHeap.js';
-import { AdapterError } from '../errors/AdapterError.js';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MemoryAdapter = void 0;
+const PriorityHeap_js_1 = require("../core/PriorityHeap.js");
+const AdapterError_js_1 = require("../errors/AdapterError.js");
 /**
  * MemoryAdapter — default in-process adapter, zero external dependencies.
  * Uses PriorityHeap internally for O(log n) priority scheduling.
  */
-export class MemoryAdapter {
-    heap = new PriorityHeap();
+class MemoryAdapter {
+    heap = new PriorityHeap_js_1.PriorityHeap();
     /** Holds jobs in non-pending states (active, done, failed, etc.) */
     store = new Map();
     // fix: secondary index for O(1) get() on heap-pending jobs instead of O(n) toArray().find()
@@ -71,6 +74,7 @@ export class MemoryAdapter {
     async close() {
         await this.clear();
         // Suppress unused import
-        void AdapterError;
+        void AdapterError_js_1.AdapterError;
     }
 }
+exports.MemoryAdapter = MemoryAdapter;
