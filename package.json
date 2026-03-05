@@ -8,7 +8,7 @@
     "exports": {
         ".": {
             "import": "./dist/esm/index.js",
-            "require": "./dist/cjs/index.cjs",
+            "require": "./dist/cjs/index.js",
             "types": "./dist/types/index.d.ts"
         }
     },
@@ -26,9 +26,10 @@
         "test:integration": "vitest run tests/integration",
         "test:watch": "vitest",
         "test:crash": "vitest run tests/integration/crash-recovery.test.ts",
+        "example": "npx tsx example/example.ts",
         "lint": "eslint src/**/*.ts",
         "format:check": "prettier --check src/**/*.ts tests/**/*.ts",
-        "prepare": "npm run build"
+        "prepublishOnly": "npm run build"
     },
     "peerDependencies": {
         "better-sqlite3": ">=11.0.0"
@@ -40,8 +41,9 @@
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.6.10",
-        "@types/node": "^20.0.0",
+        "@types/node": "^20.19.35",
         "@vitest/coverage-v8": "^2.1.8",
+        "better-sqlite3": "^12.6.2",
         "typescript": "^5.6.3",
         "vitest": "^2.1.8"
     },
