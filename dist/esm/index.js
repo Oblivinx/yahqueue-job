@@ -54,3 +54,13 @@ export { assert } from './utils/assert.js';
 // ─── Config ───────────────────────────────────────────────────────────────────
 export { resolveConfig, DEFAULT_WORKER_CONFIG, DEFAULT_PERSISTENCE_CONFIG } from './config/QueueConfig.js';
 export { validateConfig } from './config/validateConfig.js';
+// ─── Stores (Redis-compatible, no Redis required) ─────────────────────────────
+export { KvStore } from './stores/KvStore.js';
+export { SortedSet } from './stores/SortedSet.js';
+export { PubSub, TypedPubSub, IpcPubSubBridge } from './stores/PubSub.js';
+export { SessionStore } from './stores/SessionStore.js';
+export { WaBotContext } from './stores/WaBotContext.js';
+// ─── Scheduler ────────────────────────────────────────────────────────────────
+export { CronScheduler } from './scheduler/CronScheduler.js';
+// ─── WhatsApp-specific plugins ────────────────────────────────────────────────
+export { AntiSpamPlugin, WaRateLimiterPlugin, MessageBufferPlugin, CommandCooldownPlugin, } from './plugins/WhatsAppPlugins.js';
